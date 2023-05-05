@@ -1,0 +1,6 @@
+letsencrypt/*
+data/*
+.env
+docker-compose.yml
+Dockerfile
+.vscode/*
