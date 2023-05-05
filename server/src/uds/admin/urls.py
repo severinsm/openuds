@@ -30,12 +30,12 @@
 @author: Adolfo Gómez, dkmaster at dkmon dot com
 """
 from __future__ import unicode_literals
-from django.conf.urls import url
+from django.urls import re_path
 
 import uds.admin.views
 
 __updated__ = '2019-02-04'
 
 urlpatterns = [
-    url(r'^.*$', uds.admin.views.index, name='uds.admin.views.index'),
+    re_path(r'^.*$', uds.admin.views.index, name='uds.admin.views.index'),
 ]

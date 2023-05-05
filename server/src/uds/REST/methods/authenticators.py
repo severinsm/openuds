@@ -34,7 +34,7 @@ import re
 import logging
 import typing
 
-from django.utils.translation import ugettext, ugettext_lazy as _
+from django.utils.translation import gettext, gettext_lazy as _
 from uds.models import Authenticator, MFA
 from uds.core import auths
 
@@ -108,8 +108,8 @@ class Authenticators(ModelHandler):
                     {
                         'name': 'visible',
                         'value': True,
-                        'label': ugettext('Visible'),
-                        'tooltip': ugettext(
+                        'label': gettext('Visible'),
+                        'tooltip': gettext(
                             'If active, authenticator will be visible for users'
                         ),
                         'type': gui.InputField.CHECKBOX_TYPE,
@@ -130,8 +130,8 @@ class Authenticators(ModelHandler):
                                     for v in MFA.objects.all()
                                 ]
                             ),
-                            'label': ugettext('MFA Provider'),
-                            'tooltip': ugettext(
+                            'label': gettext('MFA Provider'),
+                            'tooltip': gettext(
                                 'MFA provider to use for this authenticator'
                             ),
                             'type': gui.InputField.CHOICE_TYPE,

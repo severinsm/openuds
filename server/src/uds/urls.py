@@ -31,7 +31,7 @@
 """
 
 from django.urls import re_path, path
-from django.conf.urls import include
+from django.urls import include
 from django.views.i18n import JavaScriptCatalog
 from django.views.generic.base import RedirectView
 
@@ -142,7 +142,7 @@ urlpatterns = [
         JavaScriptCatalog.as_view(),
         name='utility.jsCatalog',
     ),
-    path(r'uds/utility/i18n', include('django.conf.urls.i18n')),
+    path(r'uds/utility/i18n', include('django.urls.i18n')),
     # Downloader
     re_path(
         r'^uds/utility/download/(?P<idDownload>[a-zA-Z0-9-]*)$',

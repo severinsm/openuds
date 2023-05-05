@@ -56,20 +56,20 @@ TIME_ZONE = 'Europe/Madrid'
 # http://www.i18nguy.com/unicode/language-identifiers.html
 LANGUAGE_CODE = 'en'
 
-ugettext = lambda s: s
+gettext = lambda s: s
 
 LANGUAGES = (
-    ('es', ugettext('Spanish')),
-    ('en', ugettext('English')),
-    ('fr', ugettext('French')),
-    ('de', ugettext('German')),
-    ('pt', ugettext('Portuguese')),
-    ('it', ugettext('Italian')),
-    ('ar', ugettext('Arabic')),
-    ('eu', ugettext('Basque')),
-    ('ar', ugettext('Arabian')),
-    ('ca', ugettext('Catalan')),
-    ('zh-hans', ugettext('Chinese')),
+    ('es', gettext('Spanish')),
+    ('en', gettext('English')),
+    ('fr', gettext('French')),
+    ('de', gettext('German')),
+    ('pt', gettext('Portuguese')),
+    ('it', gettext('Italian')),
+    ('ar', gettext('Arabic')),
+    ('eu', gettext('Basque')),
+    ('ar', gettext('Arabian')),
+    ('ca', gettext('Catalan')),
+    ('zh-hans', gettext('Chinese')),
 )
 
 LANGUAGE_COOKIE_NAME = 'uds_lang'

@@ -34,7 +34,7 @@ import datetime
 import logging
 import typing
 
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 
 from uds.REST import Handler
 from uds.REST import RequestError

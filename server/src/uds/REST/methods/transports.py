@@ -34,7 +34,7 @@ import re
 import logging
 import typing
 
-from django.utils.translation import ugettext_lazy as _, ugettext
+from django.utils.translation import gettext_lazy as _, gettext
 from uds.models import Transport, Network, ServicePool
 from uds.core import transports
 from uds.core.ui import gui
@@ -95,8 +95,8 @@ class Transports(ModelHandler):
             {
                 'name': 'nets_positive',
                 'value': True,
-                'label': ugettext('Network access'),
-                'tooltip': ugettext(
+                'label': gettext('Network access'),
+                'tooltip': gettext(
                     'If checked, the transport will be enabled for the selected networks. If unchecked, transport will be disabled for selected networks'
                 ),
                 'type': 'checkbox',
@@ -112,8 +112,8 @@ class Transports(ModelHandler):
                     [{'id': x.uuid, 'text': x.name} for x in Network.objects.all()],
                     key=lambda x: x['text'].lower(),  # type: ignore
                 ),
-                'label': ugettext('Networks'),
-                'tooltip': ugettext(
+                'label': gettext('Networks'),
+                'tooltip': gettext(
                     'Networks associated with this transport. If No network selected, will mean "all networks"'
                 ),
                 'type': 'multichoice',
@@ -132,8 +132,8 @@ class Transports(ModelHandler):
                     ],
                     key=lambda x: x['text'].lower(),
                 ),
-                'label': ugettext('Allowed Devices'),
-                'tooltip': ugettext(
+                'label': gettext('Allowed Devices'),
+                'tooltip': gettext(
                     'If empty, any kind of device compatible with this transport will be allowed. Else, only devices compatible with selected values will be allowed'
                 ),
                 'type': 'multichoice',
@@ -150,8 +150,8 @@ class Transports(ModelHandler):
                     for x in ServicePool.objects.all().order_by('name')
                     if transport.protocol in x.service.getType().allowedProtocols  # type: ignore
                 ],
-                'label': ugettext('Service Pools'),
-                'tooltip': ugettext('Currently assigned services pools'),
+                'label': gettext('Service Pools'),
+                'tooltip': gettext('Currently assigned services pools'),
                 'type': 'multichoice',
                 'order': 103,
             },
@@ -162,13 +162,13 @@ class Transports(ModelHandler):
                 'name': 'label',
                 'length': 32,
                 'value': '',
-                'label': ugettext('Label'),
-                'tooltip': ugettext(
+                'label': gettext('Label'),
+                'tooltip': gettext(
                     'Metapool transport label (only used on metapool transports grouping)'
                 ),
                 'type': 'text',
                 'order': 201,
-                'tab': ugettext(gui.ADVANCED_TAB),
+                'tab': gettext(gui.ADVANCED_TAB),
             },
         )
 
