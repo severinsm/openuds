@@ -55,7 +55,7 @@ python manage.py taskManager --start &
 
 ## before using UDS, you need to create the database tables etc. ##
 
-- fill in config.py
+- fill in server\src\server\settings.py
 - run the migrate function to let UDS create the database structure:
 ```
 python manage.py migrate
