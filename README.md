@@ -24,14 +24,18 @@ _____________________
 
 default is ssl redirect enabled, so then you need to set this behind a reverse proxy.
 you can turn it off by modifying 2 files (the server\src\server\settings.py & server\src\uds\core\util)
+
+- **set redirectToHttps to 0;**
 ```
-set     # Redirect HTTP to HTTPS
+
+
+     # Redirect HTTP to HTTPS
     REDIRECT_TO_HTTPS: Config.Value = Config.section(GLOBAL_SECTION).value(
-        'redirectToHttps', **'0'**, type=Config.BOOLEAN_FIELD
+        'redirectToHttps', '0', type=Config.BOOLEAN_FIELD
     )
 ```
 
-and comment out this:
+- **comment this out**
 
 ```
 SECURE_PROXY_SSL_HEADER = (
