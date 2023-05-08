@@ -390,7 +390,7 @@ class GlobalConfig:
     )
     # Superuser password (do not need to be at database!!!)
     SUPER_USER_PASS: Config.Value = Config.section(SECURITY_SECTION).valueCrypt(
-        'rootPass', 'udsmam0', type=Config.TEXT_FIELD
+        'rootPass', 'uds', type=Config.TEXT_FIELD
     )
     # Idle time before closing session on admin
     SUPER_USER_ALLOW_WEBACCESS: Config.Value = Config.section(SECURITY_SECTION).value(
@@ -432,7 +432,7 @@ class GlobalConfig:
     # 0 = No autorun, 1 = Autorun at login
     # In a future, maybe necessary another value "2" that means that autorun always
     AUTORUN_SERVICE: Config.Value = Config.section(GLOBAL_SECTION).value(
-        'autorunService', '0', type=Config.BOOLEAN_FIELD
+        'autorunService', '1', type=Config.BOOLEAN_FIELD
     )
     # Redirect HTTP to HTTPS
     REDIRECT_TO_HTTPS: Config.Value = Config.section(GLOBAL_SECTION).value(

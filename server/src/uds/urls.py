@@ -142,7 +142,7 @@ urlpatterns = [
         JavaScriptCatalog.as_view(),
         name='utility.jsCatalog',
     ),
-    path(r'uds/utility/i18n', include('django.urls.i18n')),
+    path(r'uds/utility/i18n', include('django.conf.urls.i18n')),
     # Downloader
     re_path(
         r'^uds/utility/download/(?P<idDownload>[a-zA-Z0-9-]*)$',

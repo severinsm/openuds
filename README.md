@@ -22,8 +22,14 @@ _____________________
 
 ### **points of notice**
 
+default credentials.\
+root:uds
+
+you can adjust the default credentials in:
+server\src\uds\core\util\config.php
+
 default is ssl redirect enabled, so then you need to set this behind a reverse proxy.
-you can turn it off by modifying 2 files (the server\src\server\settings.py & server\src\uds\core\util)
+you can turn it off by modifying 2 files (the server\src\server\settings.py & server\src\uds\core\util\config.py)
 
 - **set redirectToHttps to 0;**
 ```

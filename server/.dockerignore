@@ -4,3 +4,5 @@ data/*
 docker-compose.yml
 Dockerfile
 .vscode/*
+documentation
+samples
