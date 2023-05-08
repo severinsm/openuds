@@ -32,7 +32,7 @@ import typing
 
 DEBUG = True
 
-CONFIGFILE: typing.Final[str] = '/etc/udstunnel.conf' if not DEBUG else 'udstunnel.conf'
+CONFIGFILE: typing.Final[str] = '/etc/udstunnel.conf' if not DEBUG else './src/udstunnel.conf'
 LOGFORMAT: typing.Final[str] = (
     '%(levelname)s %(asctime)s %(message)s'
     if not DEBUG
