@@ -1,5 +1,5 @@
 # base image  
-FROM    
+FROM python:3.10
 
 ## add user
 
