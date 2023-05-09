@@ -378,7 +378,8 @@ def main(args: typing.List[str]):
         QtWidgets.QMessageBox.critical(
             None,  # type: ignore
             'Notice',
-            f'UDS Client Version {VERSION}',
+            # f'UDS Client Version {VERSION}',
+            f'Detected execution without valid URI, exiting',
             QtWidgets.QMessageBox.Ok,
         )
         sys.exit(1)

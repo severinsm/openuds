@@ -2,3 +2,4 @@
 /udsclient*
 /udsclient-*.tar.gz
 /*.rpm
+dist
