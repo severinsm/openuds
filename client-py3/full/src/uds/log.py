@@ -36,8 +36,8 @@ import platform
 import sys
 import tempfile
 
-LOGLEVEL = logging.INFO
-DEBUG = False
+LOGLEVEL = logging.DEBUG
+DEBUG = True
 
 # Update debug level if uds-debug-on exists
 if 'linux' in sys.platform or 'darwin' in sys.platform:

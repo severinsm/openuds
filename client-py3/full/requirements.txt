@@ -1,0 +1,5 @@
+paramiko
+PyQt5
+six
+requests
+cryptography
