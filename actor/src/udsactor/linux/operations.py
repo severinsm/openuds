@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2014-2019 Virtual Cable S.L.
+# Copyright (c) 2014-2023 Virtual Cable S.L.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 @author: Adolfo Gómez, dkmaster at dkmon dot com
+@author: Alexander Burmatov,  thatman at altlinux dot org
 '''
 # pylint: disable=invalid-name
 import configparser
@@ -55,9 +56,7 @@ def _getMacAddr(ifname: str) -> typing.Optional[str]:
     ifnameBytes = ifname.encode('utf-8')
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        info = bytearray(
-            fcntl.ioctl(s.fileno(), 0x8927, struct.pack(str('256s'), ifnameBytes[:15]))
-        )
+        info = bytearray(fcntl.ioctl(s.fileno(), 0x8927, struct.pack(str('256s'), ifnameBytes[:15])))
         return str(''.join(['%02x:' % char for char in info[18:24]])[:-1]).upper()
     except Exception:
         return None
@@ -109,10 +108,7 @@ def _getInterfaces() -> typing.List[str]:
     )[0]
     namestr = names.tobytes()
     # return namestr, outbytes
-    return [
-        namestr[i : i + offset].split(b'\0', 1)[0].decode('utf-8')
-        for i in range(0, outbytes, length)
-    ]
+    return [namestr[i : i + offset].split(b'\0', 1)[0].decode('utf-8') for i in range(0, outbytes, length)]
 
 
 def _getIpAndMac(
@@ -137,10 +133,7 @@ def getNetworkInfo() -> typing.Iterator[types.InterfaceInfoType]:
     for ifname in _getInterfaces():
         ip, mac = _getIpAndMac(ifname)
         if (
-            mac != '00:00:00:00:00:00'
-            and mac
-            and ip
-            and ip.startswith('169.254') is False
+            mac != '00:00:00:00:00:00' and mac and ip and ip.startswith('169.254') is False
         ):  # Skips local interfaces & interfaces with no dhcp IPs
             yield types.InterfaceInfoType(name=ifname, mac=mac, ip=ip)
 
@@ -163,6 +156,7 @@ def getLinuxOs() -> str:
 def getVersion() -> str:
     return 'Linux ' + getLinuxOs()
 
+
 def reboot(flags: int = 0):
     '''
     Simple reboot using os command
@@ -171,6 +165,7 @@ def reboot(flags: int = 0):
         subprocess.call(['/sbin/shutdown', 'now', '-r'])  # nosec: fixed params
     except Exception as e:
         logger.error('Error rebooting: %s', e)
+
 
 def loggoff() -> None:
     '''
@@ -192,22 +187,86 @@ def renameComputer(newName: str) -> bool:
     rename(newName)
     return True  # Always reboot right now. Not much slower but much more convenient
 
+def joinDomain(name: str, custom: typing.Optional[typing.Mapping[str, typing.Any]] = None):
+    if not custom:
+        logger.error('Error joining domain: no custom data provided')
+        return
+    
+    # Read parameters from custom data
+    domain: str = custom.get('domain', '')
+    ou: str = custom.get('ou', '')
+    account: str = custom.get('account', '')
+    password: str = custom.get('password', '')
+    client_software: str = custom.get('client_software', '')
+    server_software: str = custom.get('server_software', '')
+    membership_software: str = custom.get('membership_software', '')
+    ssl: bool = custom.get('ssl', False)
+    automatic_id_mapping: bool = custom.get('automatic_id_mapping', False)
 
-def joinDomain(
-    domain: str, ou: str, account: str, password: str, executeInOneStep: bool = False
-):
-    pass
+    if server_software == 'ipa':
+        try:
+            hostname = getComputerName() + domain[domain.index('.'):]
+            command = f'hostnamectl set-hostname {hostname}'
+            subprocess.run(command, shell=True)
+        except Exception as e:
+            logger.error(f'Error set hostname for freeeipa: {e}')
+    try:
+        command = f'realm join -U {account} '
+        if client_software and client_software != 'automatically':
+            command += f'--client-software={client_software} '
+        if server_software:
+            command += f'--server-software={server_software} '
+        if membership_software and membership_software != 'automatically':
+            command += f'--membership-software={membership_software} '
+        if ou and server_software !='ipa':
+            command += f'--computer-ou="{ou}" '
+        if ssl == 'y':
+            command += '--use-ldaps '
+        if automatic_id_mapping == 'n':
+            command += '--automatic-id-mapping=no '
+        command += domain
+        subprocess.run(command, input=password.encode(), shell=True)
+    except Exception as e:
+        logger.error(f'Error join machine to domain {name}: {e}')
 
+def leaveDomain(
+        domain: str,
+        account: str,
+        password: str,
+        client_software: str,
+        server_software: str,
+    ) -> None:
+    if server_software == 'ipa':
+        try:
+            command = f'hostnamectl set-hostname {getComputerName()}'
+            subprocess.run(command, shell=True)
+        except Exception as e:
+            logger.error(f'Error set hostname for leave freeeipa domain: {e}')
+    try:
+        command = f'realm leave -U {account} '
+        if client_software and client_software != 'automatically':
+            command += f'--client-software={client_software} '
+        if server_software:
+            command += f'--server-software={server_software} '
+        command += domain
+        subprocess.run(command, input=password.encode(), shell=True)
+    except Exception as e:
+        logger.error(f'Error leave machine from domain {domain}: {e}')
 
-def changeUserPassword(user: str, oldPassword: str, newPassword: str) -> None:
+def changeUserPassword(
+    user: str, oldPassword: str, newPassword: str
+) -> None:  # pylint: disable=unused-argument
     '''
-    Simple password change for user using command line
+    Simple password change for user on linux
     '''
-
-    subprocess.run(  # nosec: Fine, all under control
-        'echo "{1}\n{1}" | /usr/bin/passwd {0} 2> /dev/null'.format(user, newPassword),
-        shell=True,
-    )  
+    try:
+        subprocess.Popen(
+            ['/usr/bin/passwd', user],  # nosec: Fixed params
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        ).communicate(f'{newPassword}\n{newPassword}\n'.encode('utf-8'))
+    except Exception as e:
+        logger.error('Error changing password: %s', e)
 
 
 def initIdleDuration(atLeastSeconds: int) -> None:
@@ -232,11 +291,7 @@ def getSessionType() -> str:
       * xrdp --> xrdp session
       * other types
     '''
-    return (
-        'xrdp'
-        if 'XRDP_SESSION' in os.environ
-        else os.environ.get('XDG_SESSION_TYPE', 'unknown')
-    )
+    return 'xrdp' if 'XRDP_SESSION' in os.environ else os.environ.get('XDG_SESSION_TYPE', 'unknown')
 
 
 def forceTimeSync() -> None:

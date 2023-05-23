@@ -7,11 +7,15 @@ from uds.log import logger
 import UDSClient
 from UDSLauncherMac import Ui_MacLauncher
 
-from PyQt5 import QtCore, QtWidgets, QtGui
+# First, try to use PySide6 (has arm64, x86_64 support)
+try:
+    from PySide6 import QtCore, QtWidgets, QtGui
+except ImportError:  # If not found, try to use PyQt5 (only x86_64)
+    from PyQt5 import QtCore, QtWidgets, QtGui  # type: ignore
 
 SCRIPT_NAME = 'UDSClientLauncher'
 
-class UdsApplication(QtWidgets.QApplication):
+class UdsApplication(QtWidgets.QApplication):   # type: ignore
     path: str
     tunnels: typing.List[subprocess.Popen]
 
@@ -22,6 +26,10 @@ class UdsApplication(QtWidgets.QApplication):
         self.lastWindowClosed.connect(self.closeTunnels)  # type: ignore
 
     def cleanTunnels(self) -> None:
+        '''
+        Removes all finished tunnels from the list
+        '''
+
         def isRunning(p: subprocess.Popen):
             try:
                 if p.poll() is None:
@@ -30,13 +38,13 @@ class UdsApplication(QtWidgets.QApplication):
                 logger.debug('Got error polling subprocess: %s', e)
             return False
 
-        for k in [i for i, tunnel in enumerate(self.tunnels) if not isRunning(tunnel)]:
-            try:
-                del self.tunnels[k]
-            except Exception as e:
-                logger.debug('Error closing tunnel: %s', e)
+        # Remove references to finished tunnels, they will be garbage collected
+        self.tunnels = [tunnel for tunnel in self.tunnels if isRunning(tunnel)]
 
     def closeTunnels(self) -> None:
+        '''
+        Finishes all running tunnels
+        '''
         logger.debug('Closing remaining tunnels')
         for tunnel in self.tunnels:
             logger.debug('Checking %s - "%s"', tunnel, tunnel.poll())
@@ -45,7 +53,7 @@ class UdsApplication(QtWidgets.QApplication):
                 tunnel.kill()
 
     def event(self, evnt: QtCore.QEvent) -> bool:
-        if evnt.type() == QtCore.QEvent.FileOpen:  # type: ignore
+        if evnt.type() == QtCore.QEvent.Type.FileOpen:
             fe = typing.cast(QtGui.QFileOpenEvent, evnt)
             logger.debug('Got url: %s', fe.url().url())
             fe.accept()
@@ -70,6 +78,6 @@ def main(args: typing.List[str]):
 
         sys.exit(app.exec())
 
+
 if __name__ == "__main__":
     main(args=sys.argv)
-

@@ -88,7 +88,7 @@ def selfSignedCert(ip: str, use_password: bool = True) -> typing.Tuple[str, str,
     )
 
 
-def sslContext(ip: str) -> typing.Tuple[ssl.SSLContext, str, str]:
+def sslContext() -> typing.Tuple[ssl.SSLContext, str, str]:  # pylint: disable=unused-argument
     """Returns an ssl context an the certificate & password for an ip
 
     Args:
@@ -96,18 +96,19 @@ def sslContext(ip: str) -> typing.Tuple[ssl.SSLContext, str, str]:
 
     Returns:
         typing.Tuple[ssl.SSLContext, str, str]: ssl context, certificate file and password
+        
     """
     # First, create server cert and key on temp dir
     tmpdir = tempfile.gettempdir()
     tmpname = secrets.token_urlsafe(32)
     cert, key, password = selfSignedCert('127.0.0.1')
     cert_file = f'{tmpdir}/{tmpname}.pem'
-    with open(cert_file, 'w') as f:
+    with open(cert_file, 'w', encoding='utf-8') as f:
         f.write(key)
         f.write(cert)
     # Create SSL context
     ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ssl_ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+    ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ssl_ctx.load_cert_chain(certfile=f'{tmpdir}/{tmpname}.pem', password=password)
     ssl_ctx.check_hostname = False
     ssl_ctx.set_ciphers('ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384')
@@ -115,7 +116,7 @@ def sslContext(ip: str) -> typing.Tuple[ssl.SSLContext, str, str]:
     return ssl_ctx, cert_file, password
 
 @contextlib.contextmanager
-def ssl_context(ip: str) -> typing.Generator[typing.Tuple[ssl.SSLContext, str], None, None]:
+def ssl_context() -> typing.Generator[typing.Tuple[ssl.SSLContext, str], None, None]:
     """Returns an ssl context for an ip
 
     Args:
@@ -125,7 +126,7 @@ def ssl_context(ip: str) -> typing.Generator[typing.Tuple[ssl.SSLContext, str], 
         ssl.SSLContext: ssl context
     """
     # First, create server cert and key on temp dir
-    ssl_ctx, cert_file, password = sslContext(ip)
+    ssl_ctx, cert_file, password = sslContext()  # pylint: disable=unused-variable
 
     yield ssl_ctx, cert_file
 

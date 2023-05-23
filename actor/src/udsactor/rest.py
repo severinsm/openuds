@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2019-2021 Virtual Cable S.L.U.
+# Copyright (c) 2019-2023 Virtual Cable S.L.U.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification,
@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 @author: Adolfo Gómez, dkmaster at dkmon dot com
+@author: Alexander Burmatov,  thatman at altlinux dot org
 '''
 # pylint: disable=invalid-name
 import warnings
@@ -282,17 +283,31 @@ class UDSServerApi(UDSApi):
         }
         r = self._doPost('initialize', payload)
         os = r['os']
+        # * TO BE REMOVED ON FUTURE VERSIONS *
+        # To keep compatibility, store old values on custom data
+        # This will be removed in future versions
+        # The values stored are:
+        #        username=os.get('username'),
+        #        password=os.get('password'),
+        #        new_password=os.get('new_password'),
+        #        domain=os.get('ad'),
+        #        ou=os.get('ou'),
+        # So update custom data with this info
+        custom = os.get('custom', {})
+        for i in ('username', 'password', 'new_password', 'ad', 'ou'):
+            # ad is converted to domain
+            if i not in os:
+                continue  # Skip if not present on os, do not overwrite custom
+            name = 'domain' if i == 'ad' else i
+            custom[name] = os[i]  # os[i] is present, so force it on custom
+
         return types.InitializationResultType(
             own_token=r['own_token'],
             unique_id=r['unique_id'].lower() if r['unique_id'] else None,
             os=types.ActorOsConfigurationType(
                 action=os['action'],
                 name=os['name'],
-                username=os.get('username'),
-                password=os.get('password'),
-                new_password=os.get('new_password'),
-                ad=os.get('ad'),
-                ou=os.get('ou'),
+                custom=os.get('custom'),
             )
             if r['os']
             else None,

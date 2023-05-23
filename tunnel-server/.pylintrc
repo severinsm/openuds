@@ -67,7 +67,7 @@ ignored-modules=
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-#init-hook=
+# So tests linting can find the src directory, where the code is...
 init-hook='import sys, os; sys.path.append(os.path.join(os.getcwd(), "src"))'
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
@@ -109,7 +109,7 @@ unsafe-load-any-extension=no
 [BASIC]
 
 # Naming style matching correct argument names.
-argument-naming-style=camelCase
+argument-naming-style=snake_case
 
 # Regular expression matching correct argument names. Overrides argument-
 # naming-style. If left empty, argument names will be checked with the set
@@ -117,7 +117,7 @@ argument-naming-style=camelCase
 #argument-rgx=
 
 # Naming style matching correct attribute names.
-attr-naming-style=camelCase
+attr-naming-style=snake_case
 
 # Regular expression matching correct attribute names. Overrides attr-naming-
 # style. If left empty, attribute names will be checked with the set naming
@@ -285,7 +285,7 @@ max-args=10
 max-attributes=12
 
 # Maximum number of boolean expressions in an if statement (see R0916).
-max-bool-expr=5
+max-bool-expr=6
 
 # Maximum number of branch for function / method body.
 max-branches=24
@@ -303,7 +303,7 @@ max-public-methods=32
 max-returns=9
 
 # Maximum number of statements in function / method body.
-max-statements=64
+max-statements=96
 
 # Minimum number of public methods for a class (see R0903).
 min-public-methods=1
@@ -424,13 +424,9 @@ disable=raw-checker-failed,
         deprecated-pragma,
         use-symbolic-message-instead,
         R0022,
-        broad-exception-raised,
         invalid-name,
-        broad-except,
-        no-name-in-module,  # Too many false positives... :(
-        import-error,
-        too-many-lines,
-        redefined-builtin,
+        broad-exception-caught,
+        broad-exception-raised,
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

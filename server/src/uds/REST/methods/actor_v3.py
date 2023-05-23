@@ -33,6 +33,7 @@ import time
 import logging
 import typing
 import functools
+import enum
 
 from uds.models import (
     ActorToken,
@@ -52,6 +53,7 @@ from uds.core.util import log, security
 from uds.core.util.state import State
 from uds.core.util.cache import Cache
 from uds.core.util.config import GlobalConfig
+from uds.core import exceptions
 from uds.models.service import ServiceTokenAlias
 
 from ..handlers import Handler
@@ -72,12 +74,32 @@ UNMANAGED = 'unmanaged'  # matches the definition of UDS Actors OFC
 cache = Cache('actorv3')
 
 
-class BlockAccess(Exception):
+class BlockAccess(exceptions.UDSException):
     pass
+
+
+class NotifyActionType(enum.StrEnum):
+    LOGIN = 'login'
+    LOGOUT = 'logout'
+    DATA = 'data'
+
+    @staticmethod
+    def valid_names() -> typing.List[str]:
+        return [e.value for e in NotifyActionType]
 
 
 # Helpers
 def fixIdsList(idsList: typing.List[str]) -> typing.List[str]:
+    """
+    Params:
+        idsList: List of ids to fix
+
+    Returns:
+        List of ids with both upper and lower case
+
+    Comment:
+        Due to database case sensitiveness, we need to check for both upper and lower case
+    """
     return list(set([i.upper() for i in idsList] + [i.lower() for i in idsList]))
 
 
@@ -164,6 +186,46 @@ class ActorV3Action(Handler):
 
         raise AccessDenied('Access denied')
 
+    # Some helpers
+    def notifyService(self, action: NotifyActionType) -> None:
+        try:
+            # If unmanaged, use Service locator
+            service: 'services.Service' = Service.objects.get(token=self._params['token']).getInstance()
+
+            # We have a valid service, now we can make notifications
+
+            # Build the possible ids and make initial filter to match service
+            idsList = [x['ip'] for x in self._params['id']] + [x['mac'] for x in self._params['id']][:10]
+
+            # ensure idsLists has upper and lower versions for case sensitive databases
+            idsList = fixIdsList(idsList)
+
+            validId: typing.Optional[str] = service.getValidId(idsList)
+
+            is_remote = self._params.get('session_type', '')[:4] in ('xrdp', 'RDP-')
+
+            # Must be valid
+            if action in (NotifyActionType.LOGIN, NotifyActionType.LOGOUT):
+                if not validId:  # For login/logout, we need a valid id
+                    raise Exception()
+                # Notify Service that someone logged in/out
+
+                if action == NotifyActionType.LOGIN:
+                    # Try to guess if this is a remote session
+                    service.processLogin(validId, remote_login=is_remote)
+                elif action == NotifyActionType.LOGOUT:
+                    service.processLogout(validId, remote_login=is_remote)
+            elif action == NotifyActionType.DATA:
+                service.notifyData(validId, self._params['data'])
+            else:
+                raise Exception('Invalid action')
+
+            # All right, service notified..
+        except Exception as e:
+            # Log error and continue
+            logger.error('Error notifying service: %s (%s)', e, self._params)
+            raise BlockAccess() from None
+
 
 class Test(ActorV3Action):
     """
@@ -201,6 +263,7 @@ class Register(ActorV3Action):
         - run_once_command: comand to run just once after the actor is started. The actor will stop after this.
           The command is responsible to restart the actor.
         - log_level: log level for the actor
+        - custom: Custom actor data (i.e. cetificate and comms_url for LinxApps, maybe other for other services)
 
     """
 
@@ -223,24 +286,30 @@ class Register(ActorV3Action):
             actorToken.post_command = self._params['post_command']
             actorToken.runonce_command = self._params['run_once_command']
             actorToken.log_level = self._params['log_level']
+            if 'custom' in self._params:
+                actorToken.custom = self._params['certificate']
             actorToken.stamp = getSqlDatetime()
             actorToken.save()
             logger.info('Registered actor %s', self._params)
         except Exception:  # Not found, create a new token
-            actorToken = ActorToken.objects.create(
-                username=self._user.pretty_name,
-                ip_from=self._request.ip,
-                ip=self._params['ip'],
-                ip_version=self._request.ip_version,
-                hostname=self._params['hostname'],
-                mac=self._params['mac'],
-                pre_command=self._params['pre_command'],
-                post_command=self._params['post_command'],
-                runonce_command=self._params['run_once_command'],
-                log_level=self._params['log_level'],
-                token=secrets.token_urlsafe(36),
-                stamp=getSqlDatetime(),
-            )
+            kwargs = {
+                'username': self._user.pretty_name,
+                'ip_from': self._request.ip,
+                'ip': self._params['ip'],
+                'ip_version': self._request.ip_version,
+                'hostname': self._params['hostname'],
+                'mac': self._params['mac'],
+                'pre_command': self._params['pre_command'],
+                'post_command': self._params['post_command'],
+                'runonce_command': self._params['run_once_command'],
+                'log_level': self._params['log_level'],
+                'token': secrets.token_urlsafe(36),
+                'stamp': getSqlDatetime(),
+            }
+            if 'custom' in self._params:
+                kwargs['custom'] = self._params['custom']
+
+            actorToken = ActorToken.objects.create(**kwargs)
         return ActorV3Action.actorResult(actorToken.token)
 
 
@@ -292,7 +361,10 @@ class Initialize(ActorV3Action):
         alias_token: typing.Optional[str] = None
 
         def initialization_result(
-            own_token: typing.Optional[str], unique_id: typing.Optional[str], os: typing.Any, alias_token: typing.Optional[str]
+            own_token: typing.Optional[str],
+            unique_id: typing.Optional[str],
+            os: typing.Any,
+            alias_token: typing.Optional[str],
         ) -> typing.MutableMapping[str, typing.Any]:
             return ActorV3Action.actorResult(
                 {
@@ -481,47 +553,7 @@ class Version(ActorV3Action):
         return ActorV3Action.actorResult()
 
 
-class LoginLogout(ActorV3Action):
-    name = 'notused'  # Not really important, this is not a "leaf" class and will not be directly available
-
-    def notifyService(self, isLogin: bool) -> None:
-        try:
-            # If unmanaged, use Service locator
-            service: 'services.Service' = Service.objects.get(token=self._params['token']).getInstance()
-
-            # We have a valid service, now we can make notifications
-
-            # Build the possible ids and make initial filter to match service
-            idsList = [x['ip'] for x in self._params['id']] + [x['mac'] for x in self._params['id']][:10]
-
-            # ensure idsLists has upper and lower versions for case sensitive databases
-            idsList = fixIdsList(idsList)
-
-            validId: typing.Optional[str] = service.getValidId(idsList)
-
-            # Must be valid
-            if not validId:
-                raise Exception()
-
-            # Recover Id Info from service and validId
-            # idInfo = service.recoverIdInfo(validId)
-
-            # Notify Service that someone logged in/out
-            is_remote = self._params.get('session_type', '')[:4] in ('xrdp', 'RDP-')
-            if isLogin:
-                # Try to guess if this is a remote session
-                service.processLogin(validId, remote_login=is_remote)
-            else:
-                service.processLogout(validId, remote_login=is_remote)
-
-            # All right, service notified..
-        except Exception as e:
-            # Log error and continue
-            logger.error('Error notifying service: %s (%s)', e, self._params)
-            raise BlockAccess() from None
-
-
-class Login(LoginLogout):
+class Login(ActorV3Action):
     """
     Notifies user logged id
     """
@@ -577,7 +609,7 @@ class Login(LoginLogout):
         ):  # If unamanaged host, lest do a bit more work looking for a service with the provided parameters...
             if isManaged:
                 raise
-            self.notifyService(isLogin=True)
+            self.notifyService(action=NotifyActionType.LOGIN)
 
         return ActorV3Action.actorResult(
             {
@@ -590,7 +622,7 @@ class Login(LoginLogout):
         )
 
 
-class Logout(LoginLogout):
+class Logout(ActorV3Action):
     """
     Notifies user logged out
     """
@@ -633,7 +665,7 @@ class Logout(LoginLogout):
         ):  # If unamanaged host, lest do a bit more work looking for a service with the provided parameters...
             if isManaged:
                 raise
-            self.notifyService(isLogin=False)  # Logout notification
+            self.notifyService(NotifyActionType.LOGOUT)  # Logout notification
             return ActorV3Action.actorResult(
                 'notified'
             )  # Result is that we have not processed the logout in fact, but notified the service
@@ -741,7 +773,7 @@ class Unmanaged(ActorV3Action):
         # Try to infer the ip from the valid id (that could be an IP or a MAC)
         ip: str
         try:
-            ip = next(x['ip'] for x in self._params['id'] if x['ip'] == validId or x['mac'] == validId)
+            ip = next(x['ip'] for x in self._params['id'] if validId in (x['ip'], x['mac']))
         except StopIteration:
             ip = self._params['id'][0]['ip']  # Get first IP if no valid ip found
 
@@ -782,21 +814,22 @@ class Notify(ActorV3Action):
 
     def get(self) -> typing.MutableMapping[str, typing.Any]:
         logger.debug('Args: %s,  Params: %s', self._args, self._params)
-        if (
-            'action' not in self._params
-            or 'token' not in self._params
-            or self._params['action'] not in ('login', 'logout')
-        ):
-            # Requested login or logout
-            raise RequestError('Invalid parameters')
+        try:
+            action = NotifyActionType(self._params['action'])
+            token = self._params['token']  # pylint: disable=unused-variable  # Just to check it exists
+        except Exception as e:
+            # Requested login, logout or whatever
+            raise RequestError('Invalid parameters') from e
 
         try:
             # Check block manually
             checkBlockedIp(self._request)  # pylint: disable=protected-access
-            if 'action' == 'login':
+            if action == NotifyActionType.LOGIN:
                 Login.action(typing.cast(Login, self))
-            else:
+            elif action == NotifyActionType.LOGOUT:
                 Logout.action(typing.cast(Logout, self))
+            elif action == NotifyActionType.DATA:
+                self.notifyService(action)
 
             return ActorV3Action.actorResult('ok')
         except UserService.DoesNotExist:

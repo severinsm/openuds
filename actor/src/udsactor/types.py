@@ -19,11 +19,7 @@ class AuthenticatorType(typing.NamedTuple):
 class ActorOsConfigurationType(typing.NamedTuple):
     action: str
     name: str
-    username: typing.Optional[str] = None
-    password: typing.Optional[str] = None
-    new_password: typing.Optional[str] = None
-    ad: typing.Optional[str] = None
-    ou: typing.Optional[str] = None
+    custom: typing.Optional[typing.Mapping[str, typing.Any]]
 
 class ActorDataConfigurationType(typing.NamedTuple):
     unique_id: typing.Optional[str] = None

@@ -124,8 +124,9 @@ class RDPFile:
                 params.append('/sound:sys:alsa,format:1,quality:high')
                 params.append('/microphone:sys:alsa')
             else:
-                params.append('/sound')
-                params.append('/microphone')
+                params.append('/sound')  # Mac does not support alsa
+                # And microphone seems to not work on mac
+                # params.append('/microphone')
 
         if self.multimedia:
             params.append('/video')
@@ -190,6 +191,12 @@ class RDPFile:
 
         if self.customParameters and self.customParameters.strip() != '':
             params += shlex.split(self.customParameters.strip())
+
+        # On MacOSX, /rfx /gfx:rfx are almost inprescindible, as it seems the only way to get a decent performance
+        if self.target == OsDetector.KnownOS.Macintosh:
+            for i in ('/rfx', '/gfx:rfx'):
+                if i not in params:
+                    params.append(i)
 
         return params
 
