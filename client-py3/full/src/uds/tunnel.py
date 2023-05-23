@@ -32,8 +32,6 @@ import socket
 import socketserver
 import ssl
 import threading
-import time
-import random
 import threading
 import select
 import typing
@@ -49,8 +47,10 @@ LISTEN_ADDRESS = '0.0.0.0' if DEBUG else '127.0.0.1'
 # ForwarServer states
 TUNNEL_LISTENING, TUNNEL_OPENING, TUNNEL_PROCESSING, TUNNEL_ERROR = 0, 1, 2, 3
 
+
 logger = logging.getLogger(__name__)
 
+PayLoadType = typing.Optional[typing.Tuple[typing.Optional[bytes], typing.Optional[bytes]]]
 
 class ForwardServer(socketserver.ThreadingTCPServer):
     daemon_threads = True
@@ -60,13 +60,11 @@ class ForwardServer(socketserver.ThreadingTCPServer):
     ticket: str
     stop_flag: threading.Event
     can_stop: bool
-    timeout: int
     timer: typing.Optional[threading.Timer]
     check_certificate: bool
     keep_listening: bool
     current_connections: int
     status: int
-    initial_payload: typing.Optional[bytes]
 
     def __init__(
         self,
@@ -76,28 +74,27 @@ class ForwardServer(socketserver.ThreadingTCPServer):
         local_port: int = 0,
         check_certificate: bool = True,
         keep_listening: bool = False,
-        initial_payload: typing.Optional[bytes] = None,
     ) -> None:
-        local_port = local_port or random.randrange(33000, 53000)
+        # Negative values for timeout, means "accept always connections"
+        # "but if no connection is stablished on timeout (positive)"
+        # "stop the listener"
+        # Note that this is for backwards compatibility, better use "keep_listening"
+        if timeout < 0:
+            keep_listening = True
+            timeout = abs(timeout)
 
         super().__init__(server_address=(LISTEN_ADDRESS, local_port), RequestHandlerClass=Handler)
         self.remote = remote
         self.ticket = ticket
-        # Negative values for timeout, means "accept always connections"
-        # "but if no connection is stablished on timeout (positive)"
-        # "stop the listener"
-        self.timeout = int(time.time()) + timeout if timeout > 0 else 0
         self.check_certificate = check_certificate
         self.keep_listening = keep_listening
         self.stop_flag = threading.Event()  # False initial
         self.current_connections = 0
 
-        self.initial_payload = initial_payload
-
         self.status = TUNNEL_LISTENING
         self.can_stop = False
 
-        timeout = abs(timeout) or 60
+        timeout = timeout or 60
         self.timer = threading.Timer(abs(timeout), ForwardServer.__checkStarted, args=(self,))
         self.timer.start()
 
@@ -122,6 +119,9 @@ class ForwardServer(socketserver.ThreadingTCPServer):
 
             # Do not "recompress" data, use only "base protocol" compression
             context.options |= ssl.OP_NO_COMPRESSION
+            # Macs with default installed python, does not support mininum tls version set to TLSv1.3
+            # USe "brew" version instead, or uncomment next line and comment the next one
+            # context.minimum_version = ssl.TLSVersion.TLSv1_2 if tools.isMac() else ssl.TLSVersion.TLSv1_3
             context.minimum_version = ssl.TLSVersion.TLSv1_3
 
             if tools.getCaCertsFile() is not None:
@@ -156,10 +156,14 @@ class ForwardServer(socketserver.ThreadingTCPServer):
     @property
     def stoppable(self) -> bool:
         logger.debug('Is stoppable: %s', self.can_stop)
-        return self.can_stop or (self.timeout != 0 and int(time.time()) > self.timeout)
+        return self.can_stop
 
     @staticmethod
     def __checkStarted(fs: 'ForwardServer') -> None:
+        # As soon as the timer is fired, the server can be stopped
+        # This means that:
+        #  * If not connections are stablished, the server will be stopped
+        #  * If no "keep_listening" is set, the server will not allow any new connections
         logger.debug('New connection limit reached')
         fs.timer = None
         fs.can_stop = True
@@ -198,10 +202,6 @@ class Handler(socketserver.BaseRequestHandler):
 
                 # All is fine, now we can tunnel data
 
-                # If we have a payload, send it
-                if self.server.initial_payload:
-                    ssl_socket.sendall(self.server.initial_payload)
-
                 self.process(remote=ssl_socket)
         except Exception as e:
             logger.error(f'Error connecting to {self.server.remote!s}: {e!s}')
@@ -238,10 +238,9 @@ class Handler(socketserver.BaseRequestHandler):
 
 def _run(server: ForwardServer) -> None:
     logger.debug(
-        'Starting forwarder: %s -> %s, timeout: %d',
+        'Starting forwarder: %s -> %s',
         server.server_address,
         server.remote,
-        server.timeout,
     )
     server.serve_forever()
     logger.debug('Stoped forwarder %s -> %s', server.server_address, server.remote)
@@ -253,8 +252,7 @@ def forward(
     timeout: int = 0,
     local_port: int = 0,
     check_certificate=True,
-    keep_listening=False,
-    initial_payload: typing.Optional[bytes] = None,
+    keep_listening=True,
 ) -> ForwardServer:
     fs = ForwardServer(
         remote=remote,
@@ -263,7 +261,6 @@ def forward(
         local_port=local_port,
         check_certificate=check_certificate,
         keep_listening=keep_listening,
-        initial_payload=initial_payload,
     )
     # Starts a new thread
     threading.Thread(target=_run, args=(fs,)).start()
@@ -285,9 +282,19 @@ if __name__ == "__main__":
     ticket = 'mffqg7q4s61fvx0ck2pe0zke6k0c5ipb34clhbkbs4dasb4g'
 
     fs = forward(
-        ('172.27.0.1', 7777),
+        ('demoaslan.udsenterprise.com', 11443),
         ticket,
-        local_port=49999,
+        local_port=0,
         timeout=-20,
         check_certificate=False,
     )
+    print('Listening on port', fs.server_address)
+    import socket
+    # Open a socket to local fs.server_address and send some random data
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect(fs.server_address)
+        s.sendall(b'Hello world!')
+        data = s.recv(1024)
+        print('Received', repr(data))
+    fs.stop()
+    
